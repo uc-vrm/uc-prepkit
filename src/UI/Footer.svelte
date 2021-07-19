@@ -63,9 +63,9 @@
     }
     .close{
         padding: 4px 8px;
-        position: fixed;
-        right: 0;
+        position: sticky;
         top: 10px;
+        left: 300px;
     }
     .side-questions{
         padding: 20px 15px;
@@ -75,23 +75,41 @@
         cursor: pointer;
     }
     .side-questions:hover{
-        background-color: rosybrown;
+        background-color: rgb(214, 197, 197);
     }
     .sidebar div:first-of-type{
         margin-top: 50px;
     }
 
     /* result style */
-    
-    .result-box>div:first-of-type{
+    .showScore{
+        display: block;
+        width: 100%;
+        height: 37px;
+        border: 1px solid black;
+    }
+    .showScore div{
+        float: left;
+        width: 23.5%;
+        text-align: center;
+        padding: 8px;
+        border-right: 1px solid black; 
+    }
+    .showScore div:last-of-type{
+        border-right: 0px;
+    }
+    .result-box{
+        margin-top: 0px;
+    }
+    .result-box>div.result:first-of-type{
         border-top: 1px solid black;
     }
     .result{
         width: 100%;
-        margin: 0;
+        margin-top: 0;
         border: 1px solid black;
         height: 37px;
-        border-top: 0px; 
+        border-top: 0px;
     }
     .result div{
         float: left;
@@ -110,22 +128,39 @@
         border-right: 1px solid black;
     }
     .result-question:hover{
-        background-color: rosybrown;
+        background-color: rgb(252, 244, 244);
+    }
+    .open-result{
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        padding: 10px;
+    }
+    .explain-result{
+        margin-top: 20px;
     }
     /* result style end */
     
 </style>
 <script>
-    import * as myjson from '../question.json';
+    import { each } from 'svelte/internal';
+import * as myjson from '../question.json';
+    import attemptedAnswers from '../store/storedata';
     export let isTestBegin = true;
-    let second=59,hr=0,minute=10;
+    let second=59,hr=0,minute=9;
     let startTimer;
     let arr = [];
     let contentArr = [];
     let answers = [];
     let i = 0;
     let j = 0;
+    let n;
+    let id = 1;
+    let storeData = [];
     let attemptedQuestions = 0;
+    let correct = 0;
+    let incorrect = 0;
+    let isResult = false;
     //fetchItems starts
     arr = myjson["default"];
     let contentId = arr[i]["content_id"];
@@ -133,6 +168,25 @@
     answers = contentArr["answers"];
     let lengthOfArr = arr.length;
     //fetchItem ends
+
+    // explanation of result
+    let explainId;
+    let explainArr = [];
+    let explainAnswers = [];
+    const explain = (j) => {
+        explainId = arr[j]["content_id"];
+        explainArr = JSON.parse(arr[j]["content_text"]);
+        explainAnswers = explainArr["answers"]; 
+        n = j;
+        isResult = false;
+        let chk = document.getElementsByName("chk");
+        checkAttempted();
+    }
+
+    const openResult = () => {
+        isResult = true;
+    }
+    // timer
     if(isTestBegin){
         setInterval(()=>{
             second--;
@@ -154,13 +208,33 @@
         let sidebar = document.getElementById("sidebar");
         sidebar.style.transform = "translateX(0px)";
     }
-    const nextItem = () =>{
-        let chk = document.getElementsByName("chk");
-        
-        // check attempted questions
-        for(let k=0; k<chk.length; k++){
+
+    //storing and updating data to store
+    const saveData = () => {
+         // check attempted questions
+         let chk = document.getElementsByName("chk");
+         for(let k=0; k<chk.length; k++){
             if(chk[k].checked==true){
-                console.log(answers[k]["id"]);
+                // console.log(answers[k]["id"]);
+                let answerId = answers[k]["id"];
+                let isAlreadyExist = false;
+                let data = {content_id:contentId,answer_id:answerId};
+                attemptedAnswers.update(currentData => {
+                    currentData.forEach((oldData,index) => {
+                        if(oldData["content_id"]==contentId){
+                            currentData[index].answer_id = answerId;
+                            isAlreadyExist = true;
+                            console.log("data matched");
+                        }
+                    });
+                    if(isAlreadyExist == true){
+                        return [...currentData];
+                    }
+                    if(isAlreadyExist == false){
+                        return [...currentData,data];
+                    }
+                });
+
                 attemptedQuestions++;
                 // add color to attempted questions
                 let listOfClass = document.getElementsByClassName("side-questions");
@@ -173,7 +247,50 @@
             }
         }
         // end of checking attempted questions
+    }
 
+    //fetch record from store
+    attemptedAnswers.subscribe(data => {
+        console.log(data);
+        storeData = data;
+    });
+
+    let checkCorrect = () => {
+        arr.forEach((items)=>{
+            let item = JSON.parse(items["content_text"]);
+            let correctAnswers = item["answers"];
+            storeData.forEach((storeItem)=>{
+                correctAnswers.forEach((correctAnswer)=>{
+                    if(storeItem["content_id"]==items["content_id"] && storeItem["answer_id"]==correctAnswer["id"]){
+                        if(correctAnswer["is_correct"]==1){
+                            correct++;
+                        }else{
+                            incorrect++;
+                        }
+                    }
+                });
+            });
+        });
+    }
+    //select attempted questions
+    const checkAttempted = () => {
+        let chk = document.getElementsByName("chk");
+         storeData.forEach((item)=>{
+            if(contentId==item["content_id"]){
+                let next = 0;
+                answers.forEach((val)=>{
+                    if(val["id"]==item["answer_id"]){
+                        chk[next].checked = true;
+                    }else{
+                        next++;
+                    }
+                });
+            }
+        });
+    }
+
+    const nextItem = () =>{
+        saveData();
         if(i >= lengthOfArr-1){
         }else{
             i++;
@@ -181,14 +298,15 @@
         contentArr = JSON.parse(arr[i]["content_text"]);
         answers = contentArr["answers"];
         contentId = arr[i]["content_id"];
-
-        chk = document.getElementsByName("chk");
+        let chk = document.getElementsByName("chk");
         for(let k=0; k<chk.length; k++){
             chk[k].checked = false;
         }
+        checkAttempted();
     }
 
     const prevItem = () =>{
+        saveData();
         if(i<=0){
         }else{
             i--;
@@ -196,11 +314,11 @@
         contentArr = JSON.parse(arr[i]["content_text"]);
         answers = contentArr["answers"];
         contentId = arr[i]["content_id"];
-
         let chk = document.getElementsByName("chk");
         for(let k=0; k<chk.length; k++){
             chk[k].checked = false;
         }
+        checkAttempted();
     }
     
     const endTestConferm = () =>{
@@ -210,6 +328,9 @@
     function endTest(e){
         if(e == 1){
             isTestBegin = false;
+            isResult = true;
+            saveData();
+            checkCorrect();
         }
         document.getElementById("conferm-box").style.display = "none";
     }
@@ -220,13 +341,21 @@
         sidebar.style.transform = "translateX(-300px)";
     }
     function jump(j){
+        saveData();
         i=j;
         contentArr = JSON.parse(arr[i]["content_text"]);
         answers = contentArr["answers"];
         contentId = arr[i]["content_id"];
+        let chk = document.getElementsByName("chk");
+        for(let k=0; k<chk.length; k++){
+            chk[k].checked = false;
+        }
+        checkAttempted();
     }
+    
 </script>
 
+{#if isTestBegin}
 <div class="conferm-box" id="conferm-box">
     <h2>Are you sure</h2>
     <button on:click="{()=>endTest(1)}">OK</button>
@@ -240,10 +369,8 @@
     {/each}
 </div>
 
-{#if isTestBegin}
 <!-- fetch items -->
 <div class="fetch-ques"><b>{i+1}. </b>{contentArr["question"]}</div>  
-
 {#each answers as item}
     <span class="check"><input type="radio" name="chk" id="{contentId}"/></span>
     <span class="ans"><label for="chk">{@html item["answer"]}</label></span>
@@ -260,14 +387,40 @@
         <button on:click="{endTestConferm}">End Test</button>
     </div>
 </footer>
-{:else}
-<!-- <h1>Attempted Questions:{attemptedQuestions}</h1> -->
+{:else if isResult}
+    <div class="showScore">
+        <div>Attempted:{attemptedQuestions}</div>
+        <div>Unattempted:{lengthOfArr-attemptedQuestions}</div>
+        <div>Correct:{correct}</div>
+        <div>Incorrect:{incorrect}</div>
+    </div>
     <div class="result-box">
         {#each arr as item,j}
-            <div class="result">    
+            <div class="result" on:click="{()=>explain(j)}">    
                 <div class="result-question">{j+1}.{item["snippet"]}</div>
-                <div class="result-answers">correct</div>
+                {#each storeData as answerData}
+                    {#each (JSON.parse(item["content_text"]))["answers"] as answerCorrect}
+                        {#if answerData["content_id"]==item["content_id"] && answerData["answer_id"]==answerCorrect["id"]}
+                            {#if answerCorrect["is_correct"] == 1}
+                                <div class="result-answers">correct</div>
+                            {:else}
+                                <div class="result-answers">Incorrect</div>
+                            {/if} 
+                        {/if}
+                    {/each}
+                {/each}
             </div>
         {/each}
     </div>
+{:else}
+    <div class="fetch-ques"><b>{n+1}. </b>{explainArr["question"]}</div>  
+    {#each explainAnswers as item}
+        <span class="check"><input type="radio" name="chk" id="{explainId}"/></span>
+        <span class="ans"><label for="chk">{@html item["answer"]}</label></span>
+        <br>
+    {/each}
+    <div class="explain-result">
+        {@html explainArr["explanation"]}
+    </div>
+    <button class="open-result" on:click="{openResult}">Open Result</button>
 {/if}
