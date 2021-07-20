@@ -90,7 +90,7 @@
     }
     .showScore div{
         float: left;
-        width: 23.5%;
+        width: 18.5%;
         text-align: center;
         padding: 8px;
         border-right: 1px solid black; 
@@ -143,8 +143,7 @@
     
 </style>
 <script>
-    import { each } from 'svelte/internal';
-import * as myjson from '../question.json';
+    import * as myjson from '../question.json';
     import attemptedAnswers from '../store/storedata';
     export let isTestBegin = true;
     let second=59,hr=0,minute=9;
@@ -155,12 +154,12 @@ import * as myjson from '../question.json';
     let i = 0;
     let j = 0;
     let n;
-    let id = 1;
     let storeData = [];
     let attemptedQuestions = 0;
     let correct = 0;
     let incorrect = 0;
     let isResult = false;
+    let ap = 0;
     //fetchItems starts
     arr = myjson["default"];
     let contentId = arr[i]["content_id"];
@@ -168,21 +167,15 @@ import * as myjson from '../question.json';
     answers = contentArr["answers"];
     let lengthOfArr = arr.length;
     //fetchItem ends
-
+    attemptedAnswers.subscribe(data => {
+        // console.log(data);
+        storeData = data;
+    });
     // explanation of result
     let explainId;
     let explainArr = [];
     let explainAnswers = [];
-    const explain = (j) => {
-        explainId = arr[j]["content_id"];
-        explainArr = JSON.parse(arr[j]["content_text"]);
-        explainAnswers = explainArr["answers"]; 
-        n = j;
-        isResult = false;
-        let chk = document.getElementsByName("chk");
-        checkAttempted();
-    }
-
+    let fullstr = "";
     const openResult = () => {
         isResult = true;
     }
@@ -224,13 +217,13 @@ import * as myjson from '../question.json';
                         if(oldData["content_id"]==contentId){
                             currentData[index].answer_id = answerId;
                             isAlreadyExist = true;
-                            console.log("data matched");
+                            // console.log("data matched");
                         }
                     });
                     if(isAlreadyExist == true){
                         return [...currentData];
-                    }
-                    if(isAlreadyExist == false){
+                    }else{
+                        ap++;
                         return [...currentData,data];
                     }
                 });
@@ -250,10 +243,78 @@ import * as myjson from '../question.json';
     }
 
     //fetch record from store
-    attemptedAnswers.subscribe(data => {
-        console.log(data);
-        storeData = data;
-    });
+    const explain = (j) => {
+        isResult = false;
+        explainId = arr[j]["content_id"];
+        explainArr = JSON.parse(arr[j]["content_text"]);
+        explainAnswers = explainArr["answers"]; 
+        let correctOption = 0;
+        let c = 0;
+        let cp = false;
+        explainAnswers.forEach(function(option){
+            if(option["is_correct"]==1){
+                correctOption = c;
+                cp = true;
+            }else{
+                c++;
+            }
+        });
+        fullstr = "";
+        let correctOptions = ["A","B","C","D"];
+        let optionIndex = explainArr["explanation"].indexOf("option");
+        if(optionIndex < 0){
+            optionIndex = explainArr["explanation"].indexOf("Answer");
+        }
+        let firststr = explainArr["explanation"].substring(0,optionIndex+6);
+        let secondstr = explainArr["explanation"].substring(optionIndex+6);
+        let emptyArr = false;
+        while(!emptyArr){
+            if(cp==true){
+                fullstr = fullstr +" "+ firststr +" "+ correctOptions[correctOption];
+                cp = false;
+                correctOptions.splice(correctOption,1);
+            }else{
+                if(optionIndex>0){
+                    optionIndex = secondstr.indexOf("option");
+                    firststr = secondstr.substring(0,optionIndex+6);
+                    secondstr = secondstr.substring(optionIndex+6);
+                    fullstr = fullstr +" "+ firststr +" "+ correctOptions[0];
+                    correctOptions.shift();
+                }else{
+                    if(optionIndex<0){
+                        emptyArr = true;
+                    }else{
+                        optionIndex = secondstr.indexOf("Answer");
+                        firststr = secondstr.substring(0,optionIndex+6);
+                        secondstr = secondstr.substring(optionIndex+6);
+                        fullstr = fullstr +" "+ firststr +" "+ correctOptions[0];
+                        correctOptions.shift();
+                    }
+                }
+            }    
+        }
+        fullstr = fullstr +""+secondstr;
+        n = j;
+        checkExplain();
+    }
+
+    const checkExplain = () =>{
+        let chkVal = []
+        chkVal = document.getElementsByClassName("chkVal");
+        console.log(chkVal);
+        storeData.forEach((item)=>{
+            if(explainId==item["content_id"]){
+                let next = 0;
+                explainAnswers.forEach((val)=>{
+                    if(val["id"]==item["answer_id"]){
+                        chkVal[next].checked = true;
+                    }else{
+                        next++;
+                    }
+                });
+            }
+        });
+    }
 
     let checkCorrect = () => {
         arr.forEach((items)=>{
@@ -303,6 +364,7 @@ import * as myjson from '../question.json';
             chk[k].checked = false;
         }
         checkAttempted();
+        disableBtn();
     }
 
     const prevItem = () =>{
@@ -319,6 +381,20 @@ import * as myjson from '../question.json';
             chk[k].checked = false;
         }
         checkAttempted();
+        disableBtn();
+    }
+
+    const disableBtn = () => {
+        if(i<=0){
+            document.getElementById("prev").disabled = true;
+        }else{
+            document.getElementById("prev").disabled = false;
+        }
+        if(i>=lengthOfArr-1){
+            document.getElementById("nxt").disabled = true;
+        }else if(i<lengthOfArr-1){
+            document.getElementById("nxt").disabled = false;
+        }
     }
     
     const endTestConferm = () =>{
@@ -381,18 +457,19 @@ import * as myjson from '../question.json';
     <div>
         <div>{("0"+hr).slice(-2)}:{("0"+minute).slice(-2)}:{("0"+second).slice(-2)}</div>
         <button on:click="{openList}">List</button>
-        <button on:click="{prevItem}">Previous</button>
+        <button on:click="{prevItem}" id="prev">Previous</button>
         <div>{i+1} 0f {lengthOfArr}</div>
-        <button on:click="{nextItem}">Next</button>
+        <button on:click="{nextItem}" id="nxt">Next</button>
         <button on:click="{endTestConferm}">End Test</button>
     </div>
 </footer>
 {:else if isResult}
     <div class="showScore">
-        <div>Attempted:{attemptedQuestions}</div>
-        <div>Unattempted:{lengthOfArr-attemptedQuestions}</div>
+        <div>Attempted:{ap}</div>
+        <div>Unattempted:{lengthOfArr-ap}</div>
         <div>Correct:{correct}</div>
         <div>Incorrect:{incorrect}</div>
+        <div>Percentage:{parseFloat((correct*100)/lengthOfArr).toFixed(2)}%</div>
     </div>
     <div class="result-box">
         {#each arr as item,j}
@@ -415,12 +492,12 @@ import * as myjson from '../question.json';
 {:else}
     <div class="fetch-ques"><b>{n+1}. </b>{explainArr["question"]}</div>  
     {#each explainAnswers as item}
-        <span class="check"><input type="radio" name="chk" id="{explainId}"/></span>
+        <span class="check"><input type="radio" name="chk" class="chkVal"/></span>
         <span class="ans"><label for="chk">{@html item["answer"]}</label></span>
         <br>
     {/each}
     <div class="explain-result">
-        {@html explainArr["explanation"]}
+        {@html fullstr}
     </div>
     <button class="open-result" on:click="{openResult}">Open Result</button>
 {/if}
