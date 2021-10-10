@@ -298,9 +298,8 @@
         checkExplain();
     }
 
-    const checkExplain = () =>{
-        let chkVal = []
-        chkVal = document.getElementsByClassName("chkVal");
+    const checkExplain = async () =>{
+        let chkVal = await document.getElementsByClassName("chkVal");
         console.log(chkVal);
         storeData.forEach((item)=>{
             if(explainId==item["content_id"]){
@@ -308,6 +307,7 @@
                 explainAnswers.forEach((val)=>{
                     if(val["id"]==item["answer_id"]){
                         chkVal[next].checked = true;
+                        console.log(chkVal.item(0));
                     }else{
                         next++;
                     }
